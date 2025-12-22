@@ -1,39 +1,91 @@
 <template>
   <div class="led-screen">
-    <div 
-      v-for="(row, rowIndex) in screen" 
-      :key="rowIndex" 
+    <div
+      v-for="(row, rowIndex) in screen"
+      :key="rowIndex"
       class="led-row"
     >
-      <span 
-        v-for="(dot, colIndex) in row" 
-        :key="colIndex" 
-        :class="['led-dot', { 'on': dot === 1 }]"
-        
+      <span
+        v-for="(dot, colIndex) in row"
+        :key="colIndex"
+        :class="[
+          'led-dot',
+          { 
+            on: dot === 1,
+            selected: rowIndex === selectedRow && colIndex === selectedCol,
+            hovered: rowIndex === hoverRow && colIndex === hoverCol
+          }
+        ]"
+        @mousedown="startDraw(rowIndex, colIndex)"
+        @mouseenter="draw(rowIndex, colIndex)"
+        @mouseup="stopDraw"
       ></span>
     </div>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 export default {
   setup() {
-    const rows = 32;
+    const rows = 10;
     const cols = 16;
 
-    // create 2D array filled with 0
-    const screen = ref(Array.from({ length: rows }, () => new Array(cols).fill(0)));
+    // 2D LED array
+    const screen = ref(
+      Array.from({ length: rows }, () => new Array(cols).fill(0))
+    );
 
-    // Example: turn some dots on
+    // state
+    const isDrawing = ref(false);
+    const selectedRow = ref(null);
+    const selectedCol = ref(null);
+    const hoverRow = ref(null);
+    const hoverCol = ref(null);
 
-    return { screen };
-  },
-  methods:{
+    const toggle = (row, col) => {
+      screen.value[row][col] = screen.value[row][col] ? 0 : 1;
+    };
 
+    const startDraw = (row, col) => {
+      isDrawing.value = true;
+      toggle(row, col);
+      selectedRow.value = row;
+      selectedCol.value = col;
+    };
+
+    const draw = (row, col) => {
+      hoverRow.value = row;
+      hoverCol.value = col;
+      if (!isDrawing.value) return;
+      toggle(row, col);
+    };
+
+    const stopDraw = () => {
+      isDrawing.value = false;
+    };
+
+    onMounted(() => {
+      window.addEventListener('mouseup', stopDraw);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('mouseup', stopDraw);
+    });
+
+    return {
+      screen,
+      startDraw,
+      draw,
+      stopDraw,
+      selectedRow,
+      selectedCol,
+      hoverRow,
+      hoverCol
+    };
   }
-}
+};
 </script>
 
 <style>
@@ -41,7 +93,7 @@ export default {
   display: inline-block;
   background: #222;
   padding: 10px;
-  border-radius: 8px;
+  user-select: none;
 }
 
 .led-row {
@@ -49,15 +101,28 @@ export default {
 }
 
 .led-dot {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   margin: 2px;
   border-radius: 50%;
-  background-color: #444; /* off state */
-  transition: background-color 0.2s;
+  background: #444;
+  cursor: pointer;
 }
 
+/* LED ON */
 .led-dot.on {
-  background-color: #0f0; /* on state */
+  background: #00ff55;
 }
+
+/* Hover preview */
+.led-dot.hovered:not(.selected) {
+  outline: 1px dashed #888;
+  outline-offset: 2px;
+}
+
+/* Selected LED */
+/*.led-dot.selected {
+  outline: 2px solid yellow;
+  outline-offset: 2px;
+}*/
 </style>
