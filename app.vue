@@ -10,7 +10,7 @@
         :key="colIndex"
         :class="[
           'led-dot',
-          { 
+          {
             on: dot === 1,
             selected: rowIndex === selectedRow && colIndex === selectedCol,
             hovered: rowIndex === hoverRow && colIndex === hoverCol
@@ -25,66 +25,61 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-
 export default {
-  setup() {
-    const rows = 10;
+  name: 'App',
+
+  data() {
+    const rows = 32;
     const cols = 16;
 
-    // 2D LED array
-    const screen = ref(
-      Array.from({ length: rows }, () => new Array(cols).fill(0))
-    );
-
-    // state
-    const isDrawing = ref(false);
-    const selectedRow = ref(null);
-    const selectedCol = ref(null);
-    const hoverRow = ref(null);
-    const hoverCol = ref(null);
-
-    const toggle = (row, col) => {
-      screen.value[row][col] = screen.value[row][col] ? 0 : 1;
-    };
-
-    const startDraw = (row, col) => {
-      isDrawing.value = true;
-      toggle(row, col);
-      selectedRow.value = row;
-      selectedCol.value = col;
-    };
-
-    const draw = (row, col) => {
-      hoverRow.value = row;
-      hoverCol.value = col;
-      if (!isDrawing.value) return;
-      toggle(row, col);
-    };
-
-    const stopDraw = () => {
-      isDrawing.value = false;
-    };
-
-    onMounted(() => {
-      window.addEventListener('mouseup', stopDraw);
-    });
-
-    onBeforeUnmount(() => {
-      window.removeEventListener('mouseup', stopDraw);
-    });
-
     return {
-      screen,
-      startDraw,
-      draw,
-      stopDraw,
-      selectedRow,
-      selectedCol,
-      hoverRow,
-      hoverCol
+      rows,
+      cols,
+
+      // 2D LED array
+      screen: Array.from({ length: rows }, () => new Array(cols).fill(0)),
+
+      // state
+      isDrawing: false,
+      selectedRow: null,
+      selectedCol: null,
+      hoverRow: null,
+      hoverCol: null,
     };
-  }
+  },
+
+  methods: {
+    toggle(row, col) {
+      this.screen[row][col] = this.screen[row][col] ? 0 : 1;
+    },
+
+    startDraw(row, col) {
+      this.isDrawing = true;
+      this.toggle(row, col);
+      this.selectedRow = row;
+      this.selectedCol = col;
+    },
+
+    draw(row, col) {
+      this.hoverRow = row;
+      this.hoverCol = col;
+
+      if (!this.isDrawing) return;
+      this.toggle(row, col);
+    },
+
+    stopDraw() {
+      this.isDrawing = false;
+    },
+  },
+
+  mounted() {
+    window.addEventListener('mouseup', this.stopDraw);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('mouseup', this.stopDraw);
+  },
 };
 </script>
 
