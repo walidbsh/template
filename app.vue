@@ -1,10 +1,11 @@
 <template>
-<div class="flex justify-between">
-    
+<div class="flex justify-between bg-gray-900">
+
+  <!-- LEFT: LED MATRIX -->
   <div class="border-r">
     <div class="led-screen rounded m-2">
       <div
-        v-for="(row, rowIndex) in screen"
+        v-for="(row, rowIndex) in viewScreen"
         :key="rowIndex"
         class="led-row"
       >
@@ -14,10 +15,8 @@
           class="led-dot"
           :class="{
             on: dot,
-            'led-red': dot && red,     // red if red = true and dot is on
-            'led-green': dot && !red,  // green if red = false and dot is on
-            selected: rowIndex === selectedRow && colIndex === selectedCol,
-            hovered: rowIndex === hoverRow && colIndex === hoverCol
+            'led-red': dot && red,
+            'led-green': dot && !red
           }"
           @mousedown="startDraw(rowIndex, colIndex)"
           @mouseenter="draw(rowIndex, colIndex)"
@@ -25,58 +24,48 @@
       </div>
     </div>
 
-    <div class="flex">
-      <button @click="saveScreen" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">save</button>
-      <button v-if="false" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">load</button>
-      <button @click="copyText" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">copy</button>
-      <button @click="fill_screen" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">fill</button>
-      <button @click="clear_screen" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">rest</button>
-      <button v-if="red" @click="red=!red" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">Green</button>
-      <button v-else @click="red=!red" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold">Red</button>
-      <button @click="flipScreen90" class="p-1 px-2 bg-gray-900 rounded mx-2 text-white font-bold whitespace-nowrap">flip 90°</button>
+    <!-- BUTTONS -->
+    <div class="flex flex-wrap">
+      <button @click="saveScreen" class="btn">save</button>
+      <button @click="copyText" class="btn">copy</button>
+      <button @click="fillScreen" class="btn">fill</button>
+      <button @click="clearScreen" class="btn">reset</button>
+      <button @click="red = !red" class="btn">
+        {{ red ? 'Green' : 'Red' }}
+      </button>
+      <button @click="flipScreen90" class="btn">flip 90°</button>
     </div>
   </div>
 
-
-
-
-
+  <!-- CENTER: HEX -->
   <div class="p-2">
-    <!-- <textarea :value="main_hex"></textarea> -->
-    <p v-if="true" class=" whitespace-pre-line mb-2 font-semibold text-left">{{main_hex}}</p> 
+    <p class="whitespace-pre-line font-semibold text-left text-xl text-white">
+      {{ main_hex }}
+    </p>
   </div>
 
+  <!-- RIGHT: SAVED SCREENS -->
+<div class="h-screen border-l overflow-y-hidden p-1 rotate-container">
+  <h3 class="text-left px-2">Last Saved Screens</h3>
 
-  <div class="h-screen border-l overflow-y-hidden p-1">
-    
-    <h3 class="text-left text-white px-2">Last Saved Screens</h3>
-
-    <div class="rounded grid grid-cols-2 gap-1 auto-rows-auto h-full overflow-y-auto">
-      <div
-        v-for="(s, si) in savedScreens.slice().reverse()"
-        :key="si"
-        class="small-led-screen"
-        @click="screen =  s.map(row => [...row])"
-      >
-        <div
-          v-for="(rrr, rowIndex) in s"
-          :key="rowIndex"
-          class="led-row"
-        >
-          <span
-            v-for="(dot, colIndex) in rrr"
-            :key="colIndex"
-            class="small-led-dot"
-            :class="{ on: dot }"
-          ></span>
-        </div>
+  <div class="grid grid-cols-2 gap-1 overflow-y-auto">
+    <div
+      v-for="(s, i) in  savedScreens.slice().reverse()"
+      :key="i"
+      class="small-led-screen"
+      @click="loadSaved(s)"
+    >
+      <div v-for="(r, ri) in rotateScreenMinus90(s)" :key="ri" class="led-row">
+        <span
+          v-for="(d, ci) in r"
+          :key="ci"
+          class="small-led-dot"
+          :class="{ on: d }"
+        ></span>
       </div>
     </div>
-
-
   </div>
-
-
+</div>
 
 
 </div>
@@ -88,39 +77,32 @@ export default {
 
   data() {
     return {
-      red:false,
-      rows: 16,
-      cols: 32,
+      red: false,
 
-      // ✅ REACTIVE LED MATRIX
-      screen: [],
+      ROWS: 16,
+      COLS: 32,
 
-      // state
+      rotation: 0,
+
+      baseScreen: [],
+      viewScreen: [],
+
       isDrawing: false,
-      selectedRow: null,
-      selectedCol: null,
-      hoverRow: null,
-      hoverCol: null,
-      main_hex:'',
-      words:[],
-      savedScreens:[]
+      main_hex: '',
+      savedScreens: []
     }
   },
 
   created() {
-    // create 32 x 16 matrix (cols x rows)
-    this.screen = Array.from({ length: this.cols }, () =>
-      Array.from({ length: this.rows }, () => false)
-    )
+    this.initScreens()
+    this.savedScreens = JSON.parse(localStorage.getItem('led-screens') || '[]')
+    window.addEventListener('mouseup', this.stopDraw)
   },
 
-  mounted() {
-    window.addEventListener('mouseup', this.stopDraw)
-    this.isDrawing = true
-    this.draw(0, 0)
-    this.draw(0, 0)
-    this.isDrawing = false
-    this.savedScreens = JSON.parse(localStorage.getItem('led-screens') || '[]')
+  mounted(){
+    this.flipScreen90()
+    this.flipScreen90()
+    this.flipScreen90()
   },
 
   beforeUnmount() {
@@ -128,126 +110,153 @@ export default {
   },
 
   methods: {
-    copyText() {
+    /* ---------- INIT ---------- */
+rotateScreenMinus90(screen) {
+  const rowCount = screen.length;
+  const colCount = screen[0].length;
+  const rotated = [];
 
-      // Modern approach
-      navigator.clipboard.writeText(this.main_hex)
-        .then(() => {
-          alert('Text copied to clipboard!');
-        })
-        .catch(err => {
-          console.error('Failed to copy: ', err);
-        });
-    },
-    flipScreen90() {
-      const newScreen = this.screen[0].map((_, colIndex) =>
-        this.screen.map(row => row[colIndex]).reverse()
-      );
-
-      // Swap rows and cols
-      const oldRows = this.rows;
-      this.rows = this.cols;
-      this.cols = oldRows;
-
-      this.screen = newScreen;
+  for (let c = colCount - 1; c >= 0; c--) {
+    const newRow = [];
+    for (let r = 0; r < rowCount; r++) {
+      newRow.push(screen[r][c]);
     }
-    ,
-    clear_screen(){
-      this.screen = Array.from({ length: this.cols }, () =>
-      Array.from({ length: this.rows }, () => false)
-    )
-    },
-    fill_screen(){
-      this.screen = Array.from({ length: this.cols }, () =>
-      Array.from({ length: this.rows }, () => true)
-    )
-    },
-    saveScreen() {
-      const all = JSON.parse(
-        localStorage.getItem('led-screens') || '[]'
+    rotated.push(newRow);
+  }
+
+  return rotated;
+},
+
+
+    initScreens() {
+      this.baseScreen = Array.from({ length: this.ROWS }, () =>
+        Array.from({ length: this.COLS }, () => false)
       )
-
-      // deep copy current screen
-      all.push(JSON.parse(JSON.stringify(this.screen)))
-
-      localStorage.setItem(
-        'led-screens',
-        JSON.stringify(all)
-      )
-
-      this.savedScreens = JSON.parse(localStorage.getItem('led-screens') || '[]')
-
-    },
-    loadScreen(index) {
-      const all = JSON.parse(
-        localStorage.getItem('led-screens') || '[]'
-      )
-
-      if (!all[index]) return
-
-      this.screen = JSON.parse(JSON.stringify(all[index]))
-    },
-    saveAllScreens(data) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    },
-    decToHex(n) { 
-      const hexTable = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
-      return hexTable[n] 
-    },
-    toggle(row, col) {
-      this.screen[row][col] = !this.screen[row][col]
+      this.viewScreen = this.clone(this.baseScreen)
+      this.generateHex()
     },
 
-    startDraw(row, col) {
+    clone(m) {
+      return m.map(r => r.slice())
+    },
+
+    /* ---------- DRAWING ---------- */
+
+    startDraw(r, c) {
       this.isDrawing = true
-      //this.toggle(row, col)
-      //alert('clicked')
-      this.draw(row, col)
-    },
-
-    draw(row, col) {
-      this.hoverRow = row
-      this.hoverCol = col
-
-      if (!this.isDrawing) return
-      this.toggle(row, col)
-
-      let s = ''
-      let vertical_lengh = 4
-      let vertical_acc = 0 
-      this.words = []
-
-      for (var j = 0; j < this.rows; j++){ 
-        for (var i = 0; i < this.cols ; i++) { 
-          vertical_lengh-- 
-          let p = (this.cols-i-1) % 4 
-          vertical_acc += Math.pow(2,p)*(this.screen[i][j]==0?0:1) 
-
-          if(vertical_lengh==0){ 
-            vertical_lengh = 4 
-            s = this.decToHex(vertical_acc) + s; 
-            vertical_acc = 0 
-          } 
-        } 
-        this.words.push(s) 
-        s = '' 
-      } 
-      console.log('start hexign')
-      this.main_hex = '' 
-      for (var i = 0; i < this.words.length; i++) { 
-        this.main_hex += '0x' + this.words[i] + ', '
-        if((i+1)==((this.words.length)/2)) {
-          this.main_hex += '\n'
-        } 
-      }
-      console.log('end hexign')
-      /*console.log(this.main_hex)*/
-
-
+      this.draw(r, c)
     },
 
     stopDraw() {
       this.isDrawing = false
+    },
+
+    draw(r, c) {
+      if (!this.isDrawing) return
+      this.toggle(r, c)
+    },
+
+    toggle(r, c) {
+      this.viewScreen[r][c] = !this.viewScreen[r][c]
+
+      const [br, bc] = this.viewToBase(r, c)
+      this.baseScreen[br][bc] = this.viewScreen[r][c]
+
+      this.generateHex()
+    },
+
+    /* ---------- COORD MAP ---------- */
+
+    viewToBase(r, c) {
+      const R = this.baseScreen.length
+      const C = this.baseScreen[0].length
+
+      switch (this.rotation) {
+        case 0: return [r, c]
+        case 1: return [R - 1 - c, r]
+        case 2: return [R - 1 - r, C - 1 - c]
+        case 3: return [c, C - 1 - r]
+      }
+    },
+
+    /* ---------- ROTATION ---------- */
+
+    flipScreen90() {
+      this.rotation = (this.rotation + 1) % 4
+      this.viewScreen = this.rotateCW(this.viewScreen)
+    },
+
+    rotateCW(m) {
+      return m[0].map((_, i) =>
+        m.map(row => row[i]).reverse()
+      )
+    },
+
+    /* ---------- HEX ---------- */
+
+    generateHex() {
+      let out = []
+
+      for (let r = 0; r < this.baseScreen.length; r++) {
+        let acc = 0
+        let bits = 0
+        let rowHex = ''
+
+        for (let c = 0; c < this.baseScreen[0].length; c++) {
+          acc = (acc << 1) | (this.baseScreen[r][c] ? 1 : 0)
+          bits++
+
+          if (bits === 4) {
+            rowHex += acc.toString(16).toUpperCase()
+            acc = 0
+            bits = 0
+          }
+        }
+        out.push(`0x${rowHex}`)
+      }
+      
+      this.main_hex = ""
+      for (var i = 0; i < out.length; i++) {
+        //alert(i)
+        this.main_hex += out[i] +", " 
+        if(i==7){
+          this.main_hex +=  '\n'
+        }
+      }
+
+      //this.main_hex = out.join(', ')
+    },
+
+    /* ---------- STORAGE ---------- */
+
+    saveScreen() {
+      this.savedScreens.push(this.clone(this.baseScreen))
+      localStorage.setItem('led-screens', JSON.stringify(this.savedScreens))
+    },
+
+    loadSaved(s) {
+      this.baseScreen = this.clone(s)
+      this.viewScreen = this.clone(s)
+      //this.rotation = 0
+      this.generateHex()
+    },
+
+    /* ---------- UTILS ---------- */
+
+    clearScreen() {
+      this.initScreens()
+    },
+
+    fillScreen() {
+      this.baseScreen = this.baseScreen.map(r =>
+        r.map(() => true)
+      )
+      this.viewScreen = this.clone(this.baseScreen)
+      this.generateHex()
+    },
+
+    copyText() {
+      navigator.clipboard.writeText(this.main_hex)
     }
   }
 }
@@ -255,17 +264,13 @@ export default {
 
 <style>
 .led-screen {
-  display: inline-block;
   background: #222;
   padding: 5px;
-  user-select: none;
 }
 
 .small-led-screen {
-  display: inline-block;
   background: #222;
-  padding: 10px;
-  user-select: none;
+  padding: 6px;
 }
 
 .led-row {
@@ -286,31 +291,26 @@ export default {
   height: 5px;
   border-radius: 50%;
   background: #444;
-  cursor: pointer;
 }
 
-.led-dot.on {
-  /*background: #00ff55;*/
-}
-
-.small-led-dot.on {
+.on {
   background: #00ff55;
-  opacity:50%;
 }
-
 
 .led-red {
-  background-color: #ff0000;
+  background: red;
 }
 
 .led-green {
-  background-color: #00ff55;
+  background: #00ff55;
 }
 
-
-.led-dot.hovered:not(.selected) {
-  outline: 1px dashed #888;
-  outline-offset: 2px;
+.btn {
+  margin: 4px;
+  padding: 4px 8px;
+  background: #111;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
 }
-
 </style>
